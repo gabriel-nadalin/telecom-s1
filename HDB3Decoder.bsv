@@ -35,6 +35,39 @@ module mkHDB3Decoder(HDB3Decoder);
             let value = 0;
 
             // TODO: preencha aqui com a sua lógica
+            case (state)
+                IDLE_OR_S1:
+                    if (recent_symbols == tuple4(P, Z, Z, P) ||
+                        recent_symbols == tuple4(N, Z, Z, N) ||
+                        recent_symbols == tuple4(Z, Z, Z, P) && last_pulse_p ||
+                        recent_symbols == tuple4(Z, Z, Z, N) && !last_pulse_p) action
+
+                        if (tpl_1(recent_symbols) != Z) action
+                            last_pulse_p <= !last_pulse_p;
+                        endaction
+                        state <= S2;
+                    endaction else
+                    if (tpl_1(recent_symbols) != Z) action
+                        // AMI-like decoding
+                        value = 1;
+                        last_pulse_p <= !last_pulse_p;
+                    endaction
+                S2:
+                    action
+                        dynamicAssert(tpl_1(recent_symbols) == Z, "unexpected value on S2");
+                        state <= S3;
+                    endaction
+                S3:
+                    action
+                        dynamicAssert(tpl_1(recent_symbols) == Z, "unexpected value on S3");
+                        state <= S4;
+                    endaction
+                S4:
+                    action
+                        dynamicAssert(tpl_1(recent_symbols) != Z, "unexpected value on S4");
+                        state <= IDLE_OR_S1;
+                    endaction
+            endcase
 
             fifos[0].deq;
             return value;
