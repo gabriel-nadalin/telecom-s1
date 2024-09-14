@@ -2,6 +2,10 @@ module top(CLK,
            RST_N,
            rs232_SIN,
            rs232_SOUT,
+           flashClk,
+           flashMiso,
+           flashMosi,
+           flashCs,
            LED,
            TXP,
            TXN,
@@ -14,6 +18,10 @@ module top(CLK,
     input  RST_N;
     input  rs232_SIN;
     output rs232_SOUT;
+    output flashClk;
+    input  flashMiso;
+    output flashMosi;
+    output flashCs;
     output [5 : 0] LED;
     output TXP;
     output TXN;
@@ -41,6 +49,10 @@ module top(CLK,
         .RST_N(RST_N),
         .rs232_SIN(rs232_SIN),
         .rs232_SOUT(rs232_SOUT),
+        .flashClk(flashClk),
+        .flashMiso(flashMiso),
+        .flashMosi(flashMosi),
+        .flashCs(flashCs),
         .LED(LED),
         .txp(TXP),
         .txn(TXN),
