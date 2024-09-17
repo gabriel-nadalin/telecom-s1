@@ -46,6 +46,7 @@ module mkTop#(Clock clk_uart, Clock clk_slow)(Top);
     E1Unframer unfr <- mkE1Unframer;
     mkConnection(hdb3dec.out, unfr.in);
 
+    Reg#(Bool) ligacao <- mkReg(False);
     Bit#(9) reset_value = 9'b1_0000_0000;
     Reg#(Bit#(9)) octet <- mkReg(reset_value);
     Reg#(Bit#(8)) last_ts16 <- mkReg(0);
@@ -56,6 +57,9 @@ module mkTop#(Clock clk_uart, Clock clk_slow)(Top);
             let octet_aux = octet;
             octet_aux = octet >> 1 | extend(value) << 8;
             if (octet_aux[0] == 1'b0) action
+                if (octet_aux[8:1] != last_ts16) begin
+                    ligacao <= True;
+                end
                 last_ts16 <= octet_aux[8:1];
                 octet_aux = reset_value;
             endaction
@@ -75,41 +79,29 @@ module mkTop#(Clock clk_uart, Clock clk_slow)(Top);
     mkConnection(icmp.out, toPut(icmp_out));
 
     SPIFlash spiflash <- mkSPIFlash;
-    Reg#(Bit#(9)) voice_byte <- mkReg(0);
-    Reg#(Bool) ligacao <- mkReg(False);
+    Reg#(Bit#(8)) voice_byte <- mkReg(0);
     
     // E1 framer
     Reg#(Bit#(9)) tx_index <- mkReg(0);
-    rule update_voice_byte (tx_index[7:0] == 0);
-        let voice_byte_aux;
-        if (ligacao) begin
-            let value <- spiflash.out.get;
-            voice_byte_aux = voice_byte >> 8 | extend(value) << 1;
-        end else begin
-            voice_byte_aux = 9'h55;
-        end
-        fifo_uart.enq(voice_byte_aux[7:0]);
-        voice_byte <= voice_byte_aux;
-    endrule
     rule produce_fas_nfas (tx_index[7:0] < 8);
         let i = tx_index[7:0];
+        if (i == 0 && ligacao) begin
+            let value <- spiflash.out.get;
+            voice_byte <= value;
+        end
         let fas_nfas = reverseBits(tx_index[8] == 1'b0 ? 8'b10011011 : 8'b11000111);
-        // fifo_uart.enq(tx_index[7:0]);
         hdb3enc.in.put(fas_nfas[i]);
         tx_index <= tx_index + 1;
     endrule
     rule produce_signal (tx_index[7:0] >= 128 && tx_index[7:0] < 136);
         let i = tx_index[7:0] % 8;
-        if (last_ts16 == 8'hc0) begin
-            ligacao <= True;
-        end
         hdb3enc.in.put(last_ts16[i]);
         tx_index <= tx_index + 1;
     endrule
     rule produce_voice ((tx_index[7:0] >= 8 && tx_index[7:0] < 128) || tx_index[7:0] >= 136);
         let i = tx_index[7:0] % 8;
-        let value = reverseBits(voice_byte[7:0]);
-        hdb3enc.in.put(value[i]);
+        let sample = ligacao ? reverseBits(voice_byte) : reverseBits(8'h55);
+        hdb3enc.in.put(sample[i]);
         tx_index <= tx_index + 1;
     endrule
 
